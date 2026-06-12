@@ -1,0 +1,71 @@
+# STUDX JARVIS Docker Configuration
+
+version: '3.8'
+
+services:
+  # JARVIS Backend API
+  jarvis-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: studx-jarvis-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./database:/app/database
+      - ./logs:/app/logs
+      - ./models:/app/models
+      - ./.env:/app/.env:ro
+    environment:
+      - DATABASE_PATH=/app/database/jarvis_db.sqlite
+      - LOG_PATH=/app/logs
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # JARVIS Frontend
+  jarvis-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: studx-jarvis-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - jarvis-api
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  # Ollama (Optional - for local LLM)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: studx-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    # Uncomment to use GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+networks:
+  jarvis-network:
+    driver: bridge
+
+volumes:
+  ollama-data:
